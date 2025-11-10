@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Card, CardHeader, CardBody, Typography } from "@material-tailwind/react";
 import { useMeal } from "@/context/meal";
 import { resolveBackendImage } from "@/api";
+import { formatMealDate } from "@/utils/meals";
 
 export function Tables() {
   const { meals, mealsLoading, mealsError, refreshMeals } = useMeal();
@@ -14,16 +15,38 @@ export function Tables() {
 
   const rows = useMemo(
     () =>
-      meals.map((meal) => ({
-        name: meal.name,
-        calories: meal.calories,
-        date: meal.date,
-        image:
-          resolveBackendImage(meal.image || meal.image_url || meal.filename) ||
-          null,
-      })),
+      meals.map((meal) => {
+        const dateValue =
+          meal.consumed_at ||
+          meal.timestamp ||
+          meal.date ||
+          meal.created_at ||
+          meal.metadata?.meal_date ||
+          null;
+        return {
+          name: meal.name || meal.food || "Meal",
+          calories:
+            meal.calories ?? meal.nutrition_facts?.calories ?? meal.metadata?.calories ?? "-",
+          date: dateValue ? formatMealDate(dateValue) : "Unknown date",
+          image:
+            resolveBackendImage(meal.image || meal.image_url || meal.filename) ||
+            null,
+        };
+      }),
     [meals]
   );
+
+  const totals = useMemo(() => {
+    const totalCalories = rows.reduce((sum, row) => {
+      const numeric = Number(row.calories);
+      return sum + (Number.isFinite(numeric) ? numeric : 0);
+    }, 0);
+
+    return {
+      count: rows.length,
+      calories: totalCalories,
+    };
+  }, [rows]);
 
   return (
     <div className="mt-8 mb-8 flex flex-col gap-12">
@@ -31,6 +54,15 @@ export function Tables() {
         <CardHeader className="mb-8 rounded-t-3xl bg-gradient-to-r from-[var(--food-primary)] to-[var(--food-accent)] p-6">
           <Typography variant="h6" className="font-semibold text-white">
             Calorie History
+          </Typography>
+          <Typography variant="small" className="mt-2 text-white/80">
+            {totals.count ? (
+              <>
+                {totals.count} meals • {totals.calories.toLocaleString()} kcal total
+              </>
+            ) : (
+              "No meals logged yet."
+            )}
           </Typography>
         </CardHeader>
         <CardBody className="overflow-x-auto px-0 pt-0 pb-4">

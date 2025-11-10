@@ -10,11 +10,41 @@ const DAY_INDEX = {
   0: 6,
 };
 
-export const parseMealDate = (value) => {
+const normalizeDateInput = (value) => {
   if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const isoMatch = trimmed.match(
+      /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?([+-]\d{2}:?\d{2}|Z)?$/
+    );
+    if (isoMatch) {
+      const base = isoMatch[1];
+      const zone = isoMatch[2] || "Z";
+      const parsedIso = new Date(`${base}${zone}`);
+      if (!Number.isNaN(parsedIso.getTime())) {
+        return parsedIso;
+      }
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
 };
+
+export const parseMealDate = (value) => normalizeDateInput(value);
 
 const DEFAULT_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
@@ -40,10 +70,17 @@ export const computeWeeklySeries = (meals, referenceDate = new Date()) => {
   today.setHours(0, 0, 0, 0);
 
   meals.forEach((meal) => {
-    const caloriesValue = Number(meal.calories);
+    const rawCalories =
+      meal.calories ?? meal.nutrition_facts?.calories ?? meal.metadata?.calories;
+    const caloriesValue = Number(rawCalories);
     if (!Number.isFinite(caloriesValue)) return;
 
-    const dateValue = meal.date || meal.created_at;
+    const dateValue =
+      meal.consumed_at ||
+      meal.timestamp ||
+      meal.date ||
+      meal.created_at ||
+      meal.metadata?.meal_date;
     const date = parseMealDate(dateValue);
     if (!date) return;
 

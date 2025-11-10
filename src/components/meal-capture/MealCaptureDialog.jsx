@@ -30,12 +30,14 @@ export function MealCaptureDialog({ open, onClose, onConfirm }) {
   const [draftFile, setDraftFile] = useState(null);
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [captureDate, setCaptureDate] = useState(() => new Date());
 
   const resetState = useCallback(() => {
     setPreviewUrl("");
     setDraftFile(null);
     setError("");
     setIsProcessing(false);
+    setCaptureDate(new Date());
   }, []);
 
   const handleClose = useCallback(() => {
@@ -89,9 +91,10 @@ export function MealCaptureDialog({ open, onClose, onConfirm }) {
 
   const handleConfirm = useCallback(async () => {
     if (!draftFile || !previewUrl) return;
-    await onConfirm({ file: draftFile, previewUrl });
+    const date = captureDate instanceof Date ? captureDate.toISOString() : captureDate;
+    await onConfirm({ file: draftFile, previewUrl, capturedAt: date });
     handleClose();
-  }, [draftFile, handleClose, onConfirm, previewUrl]);
+  }, [captureDate, draftFile, handleClose, onConfirm, previewUrl]);
 
   const handleRetake = useCallback(() => {
     resetState();
@@ -179,6 +182,45 @@ export function MealCaptureDialog({ open, onClose, onConfirm }) {
             Optimising photo for upload...
           </Typography>
         )}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Typography variant="small" className="font-medium text-slate-600">
+              Meal date
+            </Typography>
+            <input
+              type="date"
+              value={new Date(captureDate).toISOString().slice(0, 10)}
+              onChange={(event) => {
+                const next = new Date(captureDate);
+                const [year, month, day] = event.target.value.split("-").map(Number);
+                if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+                  next.setFullYear(year, month - 1, day);
+                  setCaptureDate(next);
+                }
+              }}
+              className="w-full rounded-xl border border-orange-100 px-3 py-2 text-sm text-slate-700 focus:border-[var(--food-primary)] focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <Typography variant="small" className="font-medium text-slate-600">
+              Meal time
+            </Typography>
+            <input
+              type="time"
+              value={new Date(captureDate).toISOString().slice(11, 16)}
+              onChange={(event) => {
+                const next = new Date(captureDate);
+                const [hour, minute] = event.target.value.split(":").map(Number);
+                if (Number.isFinite(hour) && Number.isFinite(minute)) {
+                  next.setHours(hour, minute, 0, 0);
+                  setCaptureDate(next);
+                }
+              }}
+              className="w-full rounded-xl border border-orange-100 px-3 py-2 text-sm text-slate-700 focus:border-[var(--food-primary)] focus:outline-none"
+            />
+          </div>
+        </div>
 
         <div className="flex flex-wrap gap-3">
           {!previewUrl ? (

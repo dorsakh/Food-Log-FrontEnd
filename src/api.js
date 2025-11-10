@@ -1,14 +1,24 @@
 import axios from "axios";
+import { getToken } from "@/utils/auth";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000";
-
-const API_PREFIX = "/api";
+  import.meta.env.VITE_API_BASE_URL || "https://backend-dorsa.onrender.com";
 
 export const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}${API_PREFIX}`,
+  baseURL: API_BASE_URL,
   timeout: 15000,
   withCredentials: false,
+});
+
+apiClient.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return config;
 });
 
 apiClient.interceptors.response.use(
@@ -29,26 +39,19 @@ apiClient.interceptors.response.use(
 
 const buildImageUrl = (value) => {
   if (!value) return "";
-  if (value.startsWith("http")) return value;
+  if (/^https?:/i.test(value)) return value;
 
   const normalized = value.replace(/\\/g, "/").replace(/^\/+/, "");
-  return `${API_BASE_URL}/uploads/${normalized.startsWith("uploads/") ? normalized.replace(/^uploads\//, "") : normalized}`;
+  return `${API_BASE_URL}/${normalized}`;
 };
 
-export const uploadMeal = async (file) => {
+export const predictMeal = async (file, { capturedAt } = {}) => {
   const formData = new FormData();
+  formData.append("photo", file);
   formData.append("image", file);
-
-  const { data } = await apiClient.post("/upload", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-
-  return data;
-};
-
-export const predictMeal = async (file) => {
-  const formData = new FormData();
-  formData.append("image", file);
+  if (capturedAt) {
+    formData.append("meal_date", capturedAt);
+  }
 
   const { data } = await apiClient.post("/predict", formData, {
     headers: { "Content-Type": "multipart/form-data" },
@@ -57,23 +60,28 @@ export const predictMeal = async (file) => {
   return data;
 };
 
-export const getMeals = async () => {
-  const { data } = await apiClient.get("/meals");
-  return Array.isArray(data) ? data : [];
-};
-
-export const saveMeal = async (payload) => {
-  const { data } = await apiClient.post("/save_meal", payload);
-  return data;
+export const fetchMealHistory = async () => {
+  const { data } = await apiClient.get("/history");
+  return Array.isArray(data?.items) ? data.items : [];
 };
 
 export const login = async (credentials) => {
-  const { data } = await apiClient.post("/login", credentials);
+  const { data } = await apiClient.post("/auth/login", credentials);
   return data;
 };
 
-export const getProfile = async () => {
-  const { data } = await apiClient.get("/profile");
+export const signUp = async (payload) => {
+  const { data } = await apiClient.post("/auth/signup", payload);
+  return data;
+};
+
+export const fetchCurrentUser = async () => {
+  const { data } = await apiClient.get("/auth/me");
+  return data?.user || null;
+};
+
+export const performHealthCheck = async () => {
+  const { data } = await apiClient.get("/health");
   return data;
 };
 
@@ -85,11 +93,11 @@ export const resolveBackendImage = (value) => {
 export default {
   API_BASE_URL,
   apiClient,
-  uploadMeal,
   predictMeal,
-  getMeals,
-  saveMeal,
+  fetchMealHistory,
   login,
-  getProfile,
+  signUp,
+  fetchCurrentUser,
+  performHealthCheck,
   resolveBackendImage,
 };

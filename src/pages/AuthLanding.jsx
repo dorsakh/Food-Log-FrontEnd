@@ -1,31 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Card,
-  CardBody,
-  Button,
-  Input,
-  Typography,
-} from "@material-tailwind/react";
+import { Link, useNavigate } from "react-router-dom";
+import { Card, CardBody, Button, Input, Typography } from "@material-tailwind/react";
 import { login } from "@/api";
 import { clearSession, isAuthenticated, saveSession } from "@/utils/auth";
+import { useMeal } from "@/context/meal";
 
 const INITIAL_FORM = {
   email: "",
   password: "",
-};
-
-const oauthProviders = {
-  google: {
-    label: "Continue with Google",
-    token: "google_token_456",
-    email: "user@gmail.com",
-  },
-  apple: {
-    label: "Continue with Apple",
-    token: "apple_token_789",
-    email: "apple.user@icloud.com",
-  },
 };
 
 export default function AuthLanding() {
@@ -33,6 +15,7 @@ export default function AuthLanding() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+  const { refreshMeals } = useMeal();
 
   useEffect(() => {
     if (isAuthenticated()) {
@@ -59,12 +42,16 @@ export default function AuthLanding() {
         password: form.password,
       });
 
+      const resolvedEmail = response?.user?.email || email;
+
       saveSession({
         token: response.token,
-        email,
+        email: resolvedEmail,
         provider: "password",
+        userId: response?.user?.id || null,
       });
 
+      refreshMeals().catch(() => undefined);
       navigate("/dashboard/home", { replace: true });
     } catch (error) {
       const detail =
@@ -73,25 +60,6 @@ export default function AuthLanding() {
         error?.message ||
         "Unable to authenticate with those credentials.";
       setMessage(detail);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOAuth = async (providerKey) => {
-    setMessage("");
-    const provider = oauthProviders[providerKey];
-    if (!provider) return;
-
-    setLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      saveSession({
-        token: provider.token,
-        email: provider.email,
-        provider: providerKey,
-      });
-      navigate("/dashboard/home", { replace: true });
     } finally {
       setLoading(false);
     }
@@ -169,22 +137,18 @@ export default function AuthLanding() {
             >
               {loading ? "Please wait..." : "Continue"}
             </Button>
-          </form>
-
-          <div className="space-y-4">
-            {Object.entries(oauthProviders).map(([key, provider]) => (
+            <Link to="/sign-up" className="block">
               <Button
-                key={key}
+                type="button"
                 variant="outlined"
                 color="orange"
-                className="w-full rounded-full border-orange-200 py-3 text-base font-semibold text-[var(--food-primary-dark)] hover:bg-orange-50"
-                onClick={() => handleOAuth(key)}
                 disabled={loading}
+                className="w-full rounded-full border-orange-200 py-3 text-base font-semibold text-[var(--food-primary-dark)] hover:bg-orange-50"
               >
-                {provider.label}
+                Sign up
               </Button>
-            ))}
-          </div>
+            </Link>
+          </form>
         </CardBody>
       </Card>
     </div>

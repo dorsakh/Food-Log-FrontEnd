@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Chart from "react-apexcharts";
 import {
@@ -11,14 +11,8 @@ import {
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { useMeal } from "@/context/meal";
 import { useMaterialTailwindController } from "@/context";
-import { CalorieHistoryCard } from "@/widgets/cards";
-import { resolveBackendImage } from "@/api";
 import { MealCaptureDialog } from "@/components/meal-capture/MealCaptureDialog";
-import {
-  computeWeeklySeries,
-  formatMealDate,
-  parseMealDate,
-} from "@/utils/meals";
+import { formatMealDate, parseMealDate } from "@/utils/meals";
 
 const colorPalette = {
   dark: { primary: "#f97316", secondary: "#fb923c" },
@@ -32,6 +26,11 @@ const colorPalette = {
 
 export default function FoodLogDashboard() {
   const { setCapture, setAnalysis, meals, mealsLoading, mealsError } = useMeal();
+  useEffect(() => {
+    console.groupCollapsed("[Dashboard] meals from context");
+    console.log(meals);
+    console.groupEnd();
+  }, [meals]);
   const [controller] = useMaterialTailwindController();
   const { sidenavColor } = controller;
   const navigate = useNavigate();
@@ -41,45 +40,115 @@ export default function FoodLogDashboard() {
   const openCaptureDialog = () => setIsCaptureOpen(true);
   const closeCaptureDialog = () => setIsCaptureOpen(false);
 
-  const handleCaptureConfirm = async ({ file, previewUrl }) => {
-    setCapture({ file, previewUrl });
+  const handleCaptureConfirm = async ({ file, previewUrl, capturedAt }) => {
+    setCapture({ file, previewUrl, capturedAt });
     setAnalysis(null);
     navigate("/processing");
   };
+  const normalizedMeals = useMemo(() => {
+    if (!Array.isArray(meals)) return [];
 
-  const recentMeals = useMemo(() => {
-    if (!Array.isArray(meals) || !meals.length) return [];
-
-    return [...meals]
-      .map((item, index) => {
-        const dateValue = item.date || item.created_at || "";
+    return meals
+      .map((item) => {
+        const dateValue =
+          item.consumed_at ||
+          item.metadata?.meal_date ||
+          item.timestamp ||
+          item.created_at ||
+          item.date;
         const parsedDate = parseMealDate(dateValue);
-        const sortTime = parsedDate ? parsedDate.getTime() : index * -1;
+        if (!parsedDate) {
+          console.warn("[Dashboard] unable to parse date", {
+            raw: dateValue,
+            item,
+          });
+        }
+        if (!parsedDate) return null;
+        const calories =
+          item.calories ?? item.nutrition_facts?.calories ?? null;
         return {
-          id: item.id || `${item.name || "meal"}-${index}`,
-          name: item.name || "Meal",
-          calories: item.calories ?? "-",
-          date: formatMealDate(dateValue),
-          sortTime,
-          image: resolveBackendImage(
-            item.image || item.image_url || item.filename
-          ),
+          id: item.id,
+          name: item.name || item.food || "Meal",
+          date: parsedDate,
+          calories: Number.isFinite(calories) ? Number(calories) : 0,
         };
       })
-      .sort((a, b) => b.sortTime - a.sortTime)
-      .slice(0, 3);
+      .filter(Boolean)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [meals]);
 
-  const historyError = useMemo(() => {
-    if (mealsError) return mealsError;
-    if (!mealsLoading && !recentMeals.length) return "No meal data available.";
-    return "";
-  }, [mealsError, mealsLoading, recentMeals.length]);
+  const chartData = useMemo(() => {
+    if (!normalizedMeals.length) {
+      return {
+        categories: [],
+        series: [],
+      };
+    }
 
-  const weeklySeries = useMemo(
-    () => computeWeeklySeries(meals),
-    [meals]
-  );
+    const totalsByDay = new Map();
+    normalizedMeals.forEach((meal) => {
+      const key = meal.date.toISOString().slice(0, 10);
+      const current = totalsByDay.get(key) || {
+        date: meal.date,
+        calories: 0,
+      };
+      current.calories += meal.calories;
+      totalsByDay.set(key, current);
+    });
+
+    const orderedTotals = Array.from(totalsByDay.values()).sort(
+      (a, b) => a.date.getTime() - b.date.getTime()
+    );
+
+    const recentTotals = orderedTotals.slice(-10);
+
+    return {
+      categories: recentTotals.map((entry) => formatMealDate(entry.date)),
+      series: recentTotals.map((entry) => entry.calories),
+    };
+  }, [normalizedMeals]);
+
+  const summary = useMemo(() => {
+    if (!normalizedMeals.length) {
+      return {
+        totalMeals: 0,
+        totalCalories: 0,
+        averageCalories: 0,
+        latestMeal: null,
+      };
+    }
+
+    const totalMeals = normalizedMeals.length;
+    const totalCalories = normalizedMeals.reduce(
+      (sum, meal) => sum + meal.calories,
+      0
+    );
+    const latestMeal = normalizedMeals[normalizedMeals.length - 1];
+    return {
+      totalMeals,
+      totalCalories,
+      averageCalories: Math.round(totalCalories / totalMeals),
+      latestMeal,
+    };
+  }, [normalizedMeals]);
+
+  useEffect(() => {
+    console.groupCollapsed("[Dashboard] normalized meals");
+    console.log(normalizedMeals);
+    console.groupEnd();
+  }, [normalizedMeals]);
+
+  useEffect(() => {
+    console.groupCollapsed("[Dashboard] chart data");
+    console.log(chartData);
+    console.groupEnd();
+  }, [chartData]);
+
+  useEffect(() => {
+    console.groupCollapsed("[Dashboard] summary");
+    console.log(summary);
+    console.groupEnd();
+  }, [summary]);
 
   const chartTheme = colorPalette[sidenavColor] || colorPalette.default;
 
@@ -90,7 +159,7 @@ export default function FoodLogDashboard() {
       series: [
         {
           name: "Calories",
-          data: weeklySeries,
+          data: chartData.series,
         },
       ],
       options: {
@@ -129,8 +198,11 @@ export default function FoodLogDashboard() {
           strokeDashArray: 6,
         },
         xaxis: {
-          categories: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-          labels: { style: { fontSize: "12px", fontWeight: 500 } },
+          categories: chartData.categories,
+          labels: {
+            rotate: -45,
+            style: { fontSize: "12px", fontWeight: 500 },
+          },
           axisBorder: { color: "#d5dae5" },
           axisTicks: { show: false },
         },
@@ -148,7 +220,7 @@ export default function FoodLogDashboard() {
         },
       },
     }),
-    [chartTheme, weeklySeries]
+    [chartData, chartTheme]
   );
 
   return (
@@ -172,43 +244,76 @@ export default function FoodLogDashboard() {
             </div>
           </CardHeader>
           <CardBody className="px-0 pb-6 pt-0 sm:px-2">
-            <Chart {...chartConfig} />
+            {mealsLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Typography variant="small" className="text-slate-500">
+                  Loading calorie data...
+                </Typography>
+              </div>
+            ) : chartData.series.length ? (
+              <Chart {...chartConfig} />
+            ) : (
+              <div className="flex h-64 items-center justify-center">
+                <Typography variant="small" className="text-slate-500">
+                  {mealsError || "Log your first meal to see the chart."}
+                </Typography>
+              </div>
+            )}
           </CardBody>
         </Card>
-
-        <section className="space-y-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <Typography variant="h5" className="text-[var(--food-primary-dark)]">
-              Calorie History
-            </Typography>
-            <Typography variant="small" className="text-slate-500">
-              Latest meals you&apos;ve logged
-            </Typography>
-          </div>
-          {mealsLoading ? (
-            <Card className="border border-orange-50 bg-white/70">
-              <CardBody>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="border border-orange-100/60 bg-white/85 shadow-lg shadow-orange-100/40">
+            <CardBody className="space-y-1">
+              <Typography variant="small" className="uppercase text-slate-500">
+                Meals logged
+              </Typography>
+              <Typography variant="h3" className="font-semibold text-[var(--food-primary-dark)]">
+                {summary.totalMeals}
+              </Typography>
+            </CardBody>
+          </Card>
+          <Card className="border border-orange-100/60 bg-white/85 shadow-lg shadow-orange-100/40">
+            <CardBody className="space-y-1">
+              <Typography variant="small" className="uppercase text-slate-500">
+                Total calories
+              </Typography>
+              <Typography variant="h3" className="font-semibold text-[var(--food-primary-dark)]">
+                {summary.totalCalories.toLocaleString()} kcal
+              </Typography>
+            </CardBody>
+          </Card>
+          <Card className="border border-orange-100/60 bg-white/85 shadow-lg shadow-orange-100/40">
+            <CardBody className="space-y-1">
+              <Typography variant="small" className="uppercase text-slate-500">
+                Avg meal calories
+              </Typography>
+              <Typography variant="h3" className="font-semibold text-[var(--food-primary-dark)]">
+                {summary.averageCalories || 0} kcal
+              </Typography>
+            </CardBody>
+          </Card>
+          <Card className="border border-orange-100/60 bg-white/85 shadow-lg shadow-orange-100/40">
+            <CardBody className="space-y-1">
+              <Typography variant="small" className="uppercase text-slate-500">
+                Latest meal
+              </Typography>
+              {summary.latestMeal ? (
+                <div>
+                  <Typography variant="h6" className="font-semibold text-[var(--food-primary-dark)]">
+                    {summary.latestMeal.name}
+                  </Typography>
+                  <Typography variant="small" className="text-slate-500">
+                    {formatMealDate(summary.latestMeal.date)}
+                  </Typography>
+                </div>
+              ) : (
                 <Typography variant="small" className="text-slate-500">
-                  Loading calorie history...
+                  Log a meal to see details.
                 </Typography>
-              </CardBody>
-            </Card>
-          ) : recentMeals.length ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {recentMeals.map((meal) => (
-                <CalorieHistoryCard key={meal.id} meal={meal} />
-              ))}
-            </div>
-          ) : (
-            <Card className="border border-orange-50 bg-white/70">
-              <CardBody className="flex items-center justify-center">
-                <Typography variant="small" className="text-slate-500">
-                  {historyError || "No meal data available."}
-                </Typography>
-              </CardBody>
-            </Card>
-          )}
-        </section>
+              )}
+            </CardBody>
+          </Card>
+        </div>
       </div>
 
       <div className="fixed bottom-6 left-0 right-0 z-40 flex justify-center px-4 sm:px-6">

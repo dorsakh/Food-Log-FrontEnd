@@ -8,7 +8,8 @@ import {
   useState,
 } from "react";
 import PropTypes from "prop-types";
-import { getMeals } from "@/api";
+import { fetchMealHistory } from "@/api";
+import { AUTH_EVENT, getToken } from "@/utils/auth";
 
 const MealContext = createContext(null);
 MealContext.displayName = "MealContext";
@@ -33,12 +34,19 @@ export function MealProvider({ children }) {
     setMealsLoading(true);
     setMealsError("");
     try {
-      const data = await getMeals();
+      const data = await fetchMealHistory();
+      console.groupCollapsed("[MealProvider] fetched history");
+      console.log("items", data);
+      console.groupEnd();
       if (isMounted.current) {
         setMeals(data);
+        console.info("[MealProvider] state updated", {
+          count: Array.isArray(data) ? data.length : null,
+        });
       }
       return data;
     } catch (error) {
+      console.error("[MealProvider] history fetch failed", error);
       if (isMounted.current) {
         setMeals([]);
         setMealsError(
@@ -54,7 +62,29 @@ export function MealProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    refreshMeals().catch(() => undefined);
+    const handleAuthChange = () => {
+      const token = getToken();
+      console.info("[MealProvider] auth change detected", { hasToken: Boolean(token) });
+      if (!token) {
+        if (isMounted.current) {
+          setMeals([]);
+          setMealsError("");
+        }
+        return;
+      }
+
+      refreshMeals().catch(() => undefined);
+    };
+
+    handleAuthChange();
+
+    window.addEventListener("storage", handleAuthChange);
+    window.addEventListener(AUTH_EVENT, handleAuthChange);
+
+    return () => {
+      window.removeEventListener("storage", handleAuthChange);
+      window.removeEventListener(AUTH_EVENT, handleAuthChange);
+    };
   }, [refreshMeals]);
 
   const value = useMemo(

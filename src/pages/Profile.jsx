@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, Typography, Avatar } from "@material-tailwind/react";
-import { getProfile } from "@/api";
+import { fetchCurrentUser } from "@/api";
 import { getUser } from "@/utils/auth";
+import { formatMealDate } from "@/utils/meals";
 
 const fallbackProfile = {
-  name: "Salar Momeni",
-  email: "momeni.salar@gmail.com",
-  age: 25,
-  weight: 72,
-  goal: "Maintain healthy weight",
+  id: "00000000-0000-0000-0000-000000000000",
+  email: "user@example.com",
+  created_at: null,
+  name: "Food Log User",
 };
 
 export default function Profile() {
@@ -22,6 +22,8 @@ export default function Profile() {
       setProfile((prev) => ({
         ...prev,
         email: storedUser.email,
+        name:
+          storedUser.email?.split("@")[0] || prev.name || fallbackProfile.name,
       }));
     }
   }, []);
@@ -29,15 +31,14 @@ export default function Profile() {
   useEffect(() => {
     let isMounted = true;
 
-    getProfile()
+    fetchCurrentUser()
       .then((data) => {
         if (isMounted && data) {
           setProfile({
-            name: data.name || fallbackProfile.name,
+            name: data.name || data.email?.split("@")[0] || fallbackProfile.name,
             email: data.email || fallbackProfile.email,
-            age: data.age || fallbackProfile.age,
-            weight: data.weight || fallbackProfile.weight,
-            goal: data.goal || fallbackProfile.goal,
+            id: data.id || fallbackProfile.id,
+            created_at: data.created_at || fallbackProfile.created_at,
           });
         }
       })
@@ -64,9 +65,13 @@ export default function Profile() {
   const userDetails = useMemo(
     () => [
       { label: "Email", value: profile.email },
-      { label: "Age", value: `${profile.age}` },
-      { label: "Weight", value: `${profile.weight} kg` },
-      { label: "Goal", value: profile.goal },
+      { label: "User ID", value: profile.id },
+      {
+        label: "Joined",
+        value: profile.created_at
+          ? formatMealDate(profile.created_at)
+          : "Unknown",
+      },
     ],
     [profile]
   );
@@ -107,7 +112,7 @@ export default function Profile() {
                   {item.label}
                 </Typography>
                 <Typography variant="h6" className="mt-1 font-medium text-[var(--food-primary-dark)]">
-                  {loading && item.label !== "Email" ? "Loading..." : item.value}
+                  {loading ? "Loading..." : item.value}
                 </Typography>
               </div>
             ))}

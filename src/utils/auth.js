@@ -1,25 +1,37 @@
 export const TOKEN_KEY = "foodlog_token";
 export const USER_KEY = "foodlog_user";
+export const AUTH_EVENT = "foodlog-auth-changed";
 
-export const saveSession = ({ token, email, provider }) => {
+const notifyAuthChange = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_EVENT));
+  }
+};
+
+export const saveSession = ({ token, email, provider, userId }) => {
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
   }
-  if (email || provider) {
+  if (email || provider || userId) {
     localStorage.setItem(
       USER_KEY,
       JSON.stringify({
         email: email || null,
         provider: provider || "password",
+        id: userId || null,
       })
     );
   }
+
+  notifyAuthChange();
 };
 
 export const clearSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem("foodlog_test_user");
+
+  notifyAuthChange();
 };
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);

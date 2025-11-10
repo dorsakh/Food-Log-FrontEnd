@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardBody, Typography } from "@material-tailwind/react";
 import { useMeal } from "@/context/meal";
-import { predictMeal, uploadMeal } from "@/api";
+import { predictMeal } from "@/api";
 
 export default function Processing() {
   const { capture, setAnalysis, setCapture } = useMeal();
@@ -19,26 +19,28 @@ export default function Processing() {
 
     const processMeal = async () => {
       try {
-        const uploadResult = await uploadMeal(capture.file);
-        const storedFilename =
-          uploadResult?.path ||
-          uploadResult?.image_url ||
-          uploadResult?.image ||
-          uploadResult?.filename ||
-          uploadResult?.file ||
-          null;
-        if (!storedFilename) {
-          throw new Error("Upload failed. No filename returned from server.");
+        const prediction = await predictMeal(capture.file, {
+          capturedAt: capture?.capturedAt,
+        });
+        if (!prediction) {
+          throw new Error("Prediction failed. No data returned from server.");
         }
 
-        const prediction = await predictMeal(capture.file);
+        const inferredCalories =
+          prediction?.calories ?? prediction?.nutrition_facts?.calories ?? null;
         const normalizedAnalysis = {
           meal: prediction?.meal || prediction?.food || "Logged Meal",
           ingredients: prediction?.ingredients || [],
-          calories: prediction?.calories,
-          image: storedFilename || prediction?.image || prediction?.image_url,
+          calories: inferredCalories,
+          image: prediction?.image_url || prediction?.image,
           raw: prediction,
           previewUrl: capture.previewUrl,
+          capturedAt:
+            capture?.capturedAt ||
+            prediction?.consumed_at ||
+            prediction?.timestamp ||
+            prediction?.metadata?.meal_date ||
+            null,
         };
 
         setAnalysis(normalizedAnalysis);

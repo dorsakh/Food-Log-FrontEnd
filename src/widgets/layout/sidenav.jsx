@@ -1,8 +1,9 @@
 import PropTypes from "prop-types";
-import { Link, NavLink } from "react-router-dom";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { XMarkIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 import { Button, IconButton, Typography } from "@material-tailwind/react";
 import { useMaterialTailwindController, setOpenSidenav } from "@/context";
+import { clearSession } from "@/utils/auth";
 
 const BUTTON_COLOR_MAP = {
   dark: "orange",
@@ -19,6 +20,7 @@ const resolveButtonColor = (color) =>
 export function Sidenav({ brandImg, brandName, routes }) {
   const [controller, dispatch] = useMaterialTailwindController();
   const { sidenavColor, sidenavType, openSidenav } = controller;
+  const navigate = useNavigate();
   const sidenavTypes = {
     dark: "bg-gradient-to-br from-[var(--food-primary-dark)] via-[var(--food-primary)] to-[#fb923c]",
     white: "bg-white shadow-sm",
@@ -26,6 +28,12 @@ export function Sidenav({ brandImg, brandName, routes }) {
   };
 
   const handleClose = () => setOpenSidenav(dispatch, false);
+
+  const handleSignOut = () => {
+    clearSession();
+    navigate("/", { replace: true });
+    setOpenSidenav(dispatch, false);
+  };
 
   return (
     <>
@@ -41,7 +49,7 @@ export function Sidenav({ brandImg, brandName, routes }) {
       <aside
         className={`${sidenavTypes[sidenavType]} ${
           openSidenav ? "translate-x-0" : "-translate-x-80"
-        } fixed top-4 left-4 z-50 h-[calc(100vh-32px)] w-72 rounded-3xl border border-white/40 shadow-xl shadow-orange-300/30 transition-transform duration-300 xl:translate-x-0`}
+        } fixed top-4 left-4 z-50 h-[calc(100vh-32px)] w-64 rounded-3xl border border-white/40 shadow-xl shadow-orange-300/30 transition-transform duration-300 xl:translate-x-0`}
       >
         <div className="relative">
           <Link to="/dashboard/home" className="py-6 px-8 text-center">
@@ -74,12 +82,13 @@ export function Sidenav({ brandImg, brandName, routes }) {
             <XMarkIcon strokeWidth={2.5} className="h-5 w-5 text-white" />
           </IconButton>
         </div>
-        <div className="m-4 space-y-6">
-          {routes.map(({ layout, title, pages }, key) => (
-            <ul key={key} className="flex flex-col gap-1">
-              {title && (
-                <li className="mx-3.5 mb-2">
-                  <Typography
+        <div className="flex h-[calc(100%-160px)] flex-col justify-between px-4 pb-6">
+          <div className="space-y-6 overflow-y-auto pr-1">
+            {routes.map(({ layout, title, pages }, key) => (
+              <ul key={key} className="flex flex-col gap-1">
+                {title && (
+                  <li className="mx-3.5 mb-2">
+                    <Typography
                     variant="small"
                     className={`${
                       sidenavType === "dark"
@@ -91,9 +100,9 @@ export function Sidenav({ brandImg, brandName, routes }) {
                   </Typography>
                 </li>
               )}
-              {pages.map(({ icon, name, path }) => (
-                <li key={name}>
-                  <NavLink to={path} onClick={() => openSidenav && handleClose()}>
+                {pages.map(({ icon, name, path }) => (
+                  <li key={name}>
+                    <NavLink to={path} onClick={() => openSidenav && handleClose()}>
                     {({ isActive }) => (
                       <Button
                         variant={isActive ? "gradient" : "text"}
@@ -123,10 +132,23 @@ export function Sidenav({ brandImg, brandName, routes }) {
                       </Button>
                     )}
                   </NavLink>
-                </li>
-              ))}
-            </ul>
-          ))}
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
+          <Button
+            variant="gradient"
+            color={resolveButtonColor(sidenavColor)}
+            className={`mt-6 flex items-center justify-center gap-2 rounded-2xl py-2 font-semibold ${
+              sidenavType === "dark" ? "bg-white/20 text-white" : "text-white"
+            }`}
+            onClick={handleSignOut}
+            fullWidth
+          >
+            <ArrowRightOnRectangleIcon className="h-5 w-5" />
+            Sign out
+          </Button>
         </div>
       </aside>
     </>

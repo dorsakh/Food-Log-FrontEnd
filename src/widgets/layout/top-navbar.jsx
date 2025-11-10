@@ -81,8 +81,8 @@ export function TopNavbar() {
   }, [sidenavColor]);
 
   const navPositionClasses = fixedNavbar
-    ? "fixed top-0 left-0 right-0 xl:left-80"
-    : "relative w-full xl:ml-80";
+    ? "fixed top-0 left-0 right-0 xl:left-72"
+    : "relative w-full xl:ml-72";
 
   return (
     <nav
@@ -143,5 +143,3 @@ export function TopNavbar() {
 TopNavbar.displayName = "/src/widgets/layout/top-navbar.jsx";
 
 export default TopNavbar;
-
-

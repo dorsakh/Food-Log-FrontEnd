@@ -15,7 +15,7 @@ export function Dashboard() {
   return (
     <div className="relative min-h-screen">
       <Sidenav routes={dashboardRoutes} />
-      <div className="flex min-h-screen flex-col xl:pl-80">
+      <div className="flex min-h-screen flex-col xl:pl-72">
         <TopNavbar />
         <main
           className={`${paddingTop} flex-1 px-4 pb-10 transition-all duration-300`}

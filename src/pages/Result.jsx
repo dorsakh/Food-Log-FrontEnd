@@ -8,7 +8,8 @@ import {
   Typography,
 } from "@material-tailwind/react";
 import { useMeal } from "@/context/meal";
-import { resolveBackendImage, saveMeal } from "@/api";
+import { resolveBackendImage } from "@/api";
+import { formatMealDate } from "@/utils/meals";
 
 export default function Result() {
   const { capture, analysis, setCapture, setAnalysis, refreshMeals } = useMeal();
@@ -33,6 +34,11 @@ export default function Result() {
   const ingredients = analysis?.ingredients || [];
   const calories = analysis?.calories;
   const mealName = analysis?.meal || "Logged Meal";
+  const mealDate = analysis?.capturedAt
+    ? formatMealDate(analysis.capturedAt)
+    : analysis?.raw?.timestamp
+    ? formatMealDate(analysis.raw.timestamp)
+    : null;
 
   const resetFlow = () => {
     setCapture(null);
@@ -50,18 +56,7 @@ export default function Result() {
     setSaving(true);
 
     try {
-      const numericCalories =
-        typeof calories === "number" ? calories : Number(calories);
-      const caloriesValue = Number.isFinite(numericCalories)
-        ? Math.round(numericCalories)
-        : 0;
-
-      await saveMeal({
-        name: mealName,
-        calories: caloriesValue,
-        image: analysis.image || analysis.image_url,
-      });
-      await refreshMeals().catch(() => undefined);
+      await refreshMeals();
       resetFlow();
       navigate("/dashboard/home", { replace: true });
     } catch (err) {
@@ -92,6 +87,11 @@ export default function Result() {
                   className="h-64 w-full object-cover"
                 />
               </div>
+              {mealDate && (
+                <Typography variant="small" className="text-slate-500">
+                  Logged for {mealDate}
+                </Typography>
+              )}
             </div>
             <div className="flex flex-col gap-4">
               <div>

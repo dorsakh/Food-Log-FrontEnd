@@ -11,6 +11,7 @@ import Profile from "@/pages/Profile";
 import { Tables } from "@/pages/dashboard";
 import Processing from "@/pages/Processing";
 import Result from "@/pages/Result";
+import { SignIn, SignUp } from "@/pages/auth";
 import { isAuthenticated } from "@/utils/auth";
 
 const DashboardShell = () =>
@@ -24,6 +25,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<AuthLanding />} />
+        <Route path="/sign-in" element={<SignIn />} />
+        <Route path="/sign-up" element={<SignUp />} />
 
         <Route element={<DashboardShell />}>
           <Route path="/dashboard/home" element={<FoodLogDashboard />} />
@@ -55,4 +58,3 @@ function App() {
 }
 
 export default App;
-
