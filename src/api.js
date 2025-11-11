@@ -2,7 +2,7 @@ import axios from "axios";
 import { getToken } from "@/utils/auth";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://food-log-backend-1.onrender.com";
+  import.meta.env.VITE_API_BASE_URL || "https://food-log-backend-2.onrender.com";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
