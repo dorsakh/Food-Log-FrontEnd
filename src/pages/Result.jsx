@@ -31,14 +31,25 @@ export default function Result() {
     return "/img/home-decor-1.jpeg";
   }, [analysis, capture]);
 
-  const ingredients = analysis?.ingredients || [];
-  const calories = analysis?.calories;
-  const mealName = analysis?.meal || "Logged Meal";
+  const predictions = useMemo(() => {
+    if (Array.isArray(analysis?.predictions)) return analysis.predictions;
+    if (Array.isArray(analysis?.raw?.hf_predictions)) {
+      return analysis.raw.hf_predictions;
+    }
+    return [];
+  }, [analysis]);
+
+  const mealName = analysis?.food || analysis?.meal || "Logged Meal";
   const mealDate = analysis?.capturedAt
     ? formatMealDate(analysis.capturedAt)
     : analysis?.raw?.timestamp
     ? formatMealDate(analysis.raw.timestamp)
     : null;
+  const formatScore = (score) => {
+    if (typeof score !== "number") return null;
+    const normalizedScore = score > 1 ? score : score * 100;
+    return `${normalizedScore.toFixed(1)}%`;
+  };
 
   const resetFlow = () => {
     setCapture(null);
@@ -94,33 +105,48 @@ export default function Result() {
               )}
             </div>
             <div className="flex flex-col gap-4">
-              <div>
-                <Typography variant="small" className="font-semibold uppercase text-slate-500">
-                  Ingredients
-                </Typography>
-                <ul className="mt-2 space-y-2">
-                  {ingredients.map((ingredient) => (
-                    <li
-                      key={ingredient}
-                      className="rounded-xl border border-orange-50 bg-orange-50/60 px-4 py-2 text-sm font-medium text-[var(--food-primary-dark)]"
-                    >
-                      {ingredient}
-                    </li>
-                  ))}
-                  {!ingredients.length && (
-                    <li className="rounded-xl border border-dashed border-orange-200 px-4 py-3 text-sm text-orange-300">
-                      Ingredients will appear here after analysis.
-                    </li>
-                  )}
-                </ul>
-              </div>
               <div className="rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 via-white to-teal-50 px-5 py-4 text-[var(--food-primary)] shadow-inner">
                 <Typography variant="small" className="uppercase tracking-wide text-[var(--food-primary-dark)]">
-                  Estimated Nutrition
+                  Detected Meal
                 </Typography>
                 <Typography variant="h5" className="mt-2 font-semibold text-[var(--food-primary-dark)]">
-                  {calories ? `${calories} Cal` : "Calculating..."}
+                  {mealName}
                 </Typography>
+                {predictions[0]?.score && (
+                  <Typography variant="small" className="mt-1 text-slate-600">
+                    Confidence {formatScore(predictions[0].score)}
+                  </Typography>
+                )}
+              </div>
+              <div>
+                <Typography variant="small" className="font-semibold uppercase text-slate-500">
+                  Hugging Face Predictions
+                </Typography>
+                {predictions.length ? (
+                  <ul className="mt-3 space-y-2">
+                    {predictions.map((prediction, index) => (
+                      <li
+                        key={`${prediction.label ?? "prediction"}-${index}`}
+                        className="rounded-xl border border-orange-50 bg-orange-50/60 px-4 py-2 text-sm text-[var(--food-primary-dark)]"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="font-medium">
+                            {index + 1}. {prediction.label || "Unknown"}
+                          </span>
+                          {formatScore(prediction.score) && (
+                            <span className="text-[var(--food-primary)]">
+                              {formatScore(prediction.score)}
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="mt-2 rounded-xl border border-dashed border-orange-200 px-4 py-3 text-sm text-orange-300">
+                    Additional predictions are unavailable, but we detected {mealName}.
+                  </div>
+                )}
               </div>
             </div>
           </div>

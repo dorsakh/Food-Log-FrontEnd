@@ -28,10 +28,20 @@ export default function Processing() {
 
         const inferredCalories =
           prediction?.calories ?? prediction?.nutrition_facts?.calories ?? null;
+        const hfPredictions = Array.isArray(prediction?.hf_predictions)
+          ? prediction.hf_predictions.filter((item) => item && item.label)
+          : [];
+        const detectedFood =
+          prediction?.food ||
+          prediction?.meal ||
+          hfPredictions[0]?.label ||
+          "Logged Meal";
         const normalizedAnalysis = {
-          meal: prediction?.meal || prediction?.food || "Logged Meal",
+          meal: detectedFood,
           ingredients: prediction?.ingredients || [],
           calories: inferredCalories,
+          predictions: hfPredictions,
+          food: detectedFood,
           image: prediction?.image_url || prediction?.image,
           raw: prediction,
           previewUrl: capture.previewUrl,
